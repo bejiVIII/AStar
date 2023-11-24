@@ -4,7 +4,6 @@ import java.net.URL;
 import java.util.Random;
 import java.util.ResourceBundle;
 
-import javafx.animation.Timeline;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.EventHandler;
@@ -22,11 +21,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.GridPane;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.scene.shape.LineTo;
-import javafx.scene.shape.MoveTo;
-import javafx.scene.shape.Path;
 
 public class MainController implements Initializable
 {
@@ -134,6 +129,15 @@ public class MainController implements Initializable
 		{
 			for(int j = 0; j < COLS /2; j++)
 			{
+				if(cells[i][j].isStartCell())
+				{
+					startCell = cells[i][j];
+				}
+				if(cells[i][j].isEndCell())
+				{
+					endCell = cells[i][j];
+				}
+
 				System.out.printf("Cells(i: %d, j: %d): \n", i, j);
 				System.out.printf("layout x: %.2f\n",cells[i][j].getLayoutX());
 				System.out.printf("layout y: %.2f\n",cells[i][j].getLayoutY());
@@ -141,6 +145,8 @@ public class MainController implements Initializable
 			}
 		}
 		
+		System.out.println(startCell);
+		System.out.println(endCell);
 	}
 	
 	public void showGridLines()
@@ -169,8 +175,8 @@ public class MainController implements Initializable
 				}
 				else
 				{
-					System.out.println(cells[i][j]);
-					System.out.println("is start cell or end cell");
+					//System.out.println(cells[i][j]);
+					//System.out.println("is start cell or end cell");
 				}
 			}
 		}

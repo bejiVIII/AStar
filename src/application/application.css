@@ -1,16 +1,10 @@
 /* JavaFX CSS - Leave this comment until you have at least create one rule which uses -fx-Property */
 
-<<<<<<< HEAD
 #cell {
 	-fx-background-color: pink;
 	-fx-border-color: black;
-=======
-#mainAnchor {
-	-fx-background-color: red;
 }
 
-#cell {
-	
->>>>>>> 8798023 (All the user interface is done. User can place walls manually, place a source node and a destination node, can create random walls using the 'Generate random walls' button, same goes for the 'maze'. User can also see the grid lines.)
-	-fx-border-width: 0.2;
+#mainAnchor {
+	-fx-background-color: red;
 }
