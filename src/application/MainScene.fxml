@@ -18,15 +18,15 @@
             <Slider fx:id="speedSlider" layoutX="123.0" layoutY="13.0" value="100.0" />
             <Label layoutX="84.0" layoutY="11.0" text="Speed: " />
             <Label fx:id="sliderValueLabel" layoutX="270.0" layoutY="12.0" text="100%" />
-            <Button layoutX="5.0" layoutY="5.0" mnemonicParsing="false" onAction="#executeAlgo" prefHeight="30.0" prefWidth="70.0" text="Run" />
+            <Button layoutX="5.0" layoutY="5.0" mnemonicParsing="false" onAction="#run" prefHeight="30.0" prefWidth="72.0" text="Run" />
             <Slider fx:id="speedSlider" layoutX="736.0" layoutY="13.0" value="100.0" />
             <Label layoutX="697.0" layoutY="11.0" text="Speed: " />
             <Label fx:id="sliderValueLabel" layoutX="883.0" layoutY="12.0" text="100%" />
-            <Button layoutX="83.0" layoutY="5.0" mnemonicParsing="false" onAction="#generateRandomWalls" prefHeight="30.0" prefWidth="140.0" text="Generate random walls" />
+            <Button layoutX="84.0" layoutY="5.0" mnemonicParsing="false" onAction="#generateRandomWalls" prefHeight="30.0" prefWidth="140.0" text="Generate random walls" />
             <Button fx:id="clearButton" layoutX="387.0" layoutY="5.0" mnemonicParsing="false" onAction="#clearGrid" prefHeight="30.0" prefWidth="86.0" text=" Clear Grid" />
             <Label layoutX="479.0" layoutY="12.0" text="Tile picker: " />
             <ComboBox fx:id="tilePickerComboBox" layoutX="539.0" layoutY="7.0" prefWidth="150.0" promptText="Wall" />
-            <Button layoutX="230.0" layoutY="5.0" mnemonicParsing="false" onAction="#generateMaze" prefHeight="30.0" prefWidth="150.0" text="Generate a random maze" />
+            <Button layoutX="231.0" layoutY="5.0" mnemonicParsing="false" onAction="#generateMaze" prefHeight="30.0" prefWidth="150.0" text="Generate a random maze" />
             <CheckBox fx:id="showGridLines" layoutX="920.0" layoutY="12.0" mnemonicParsing="false" onAction="#showGridLines" text="Show grid lines" />
          </children>
       </AnchorPane>
