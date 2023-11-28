@@ -1,6 +1,8 @@
 package application;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -13,10 +15,7 @@ public class Cell extends Pane {
 	private boolean isGoalCell;
 	private boolean isInOpenSet;
 	private boolean isInClosedSet;
-	//Parent node: reference to the node that was expanded to generate the current node.
-	private Cell parentNode;
-	private double x;
-	private double y;
+	
 	private int i;
 	private int j;
 	//G-Cost: the cost of getting from the start node to this node.
@@ -25,7 +24,8 @@ public class Cell extends Pane {
 	public double hCost;
 	//F-Cost: the total cost, which is the sum of the G-Cost and the H-Cost.
 	public double fCost;
-	
+	//Parent node: reference to the node that was expanded to generate the current node.
+	public Cell previous;
 	
 	private ArrayList<Cell> neighbors = new ArrayList<Cell>();
 	
@@ -34,13 +34,11 @@ public class Cell extends Pane {
 		this.i = i;
 		this.j = j;
 		
-		x = getLayoutX();
-		y = getLayoutY();
-		
+		//System.out.println(getLayoutX());
 		gCost = 0.0;
 		hCost = 0.0;
 		fCost = 0.0;
-		parentNode = null;
+		//previous = null;
 	}
 	
 	public void addNeighbor(Cell c)
@@ -52,7 +50,7 @@ public class Cell extends Pane {
 	{
 		return neighbors;
 	}
-	
+
 	public void calculateFCost()
 	{
 		fCost = gCost + hCost;
@@ -67,21 +65,7 @@ public class Cell extends Pane {
 	{
 		return j;
 	}
-	
-	public double getX()
-	{
-		return x;
-	}
-	
-	public double getY()
-	{
-		return y;
-	}
 
-	public Cell getParentNode()
-	{
-		return parentNode;
-	}
 	
 	public boolean isStartCell()
 	{
@@ -163,21 +147,20 @@ public class Cell extends Pane {
 	
 				
 	        } else if (isWall){
-	        	Circle c = new Circle();
-				c.setRadius(7);
-				
-				c.setCenterX(13);
-				c.setCenterY(9.5);
-				c.setFill(Color.BLACK);
-				
-				getChildren().add(c);
+//	        	Circle c = new Circle();
+//				c.setRadius(7);
+//				
+//				c.setCenterX(13);
+//				c.setCenterY(9.5);
+//				c.setFill(Color.BLACK);
+//				
+//				getChildren().add(c);
+	        	setStyle("-fx-background-color: black;");
+
 				// or any other color for regular cells
-	        } else if(isInOpenSet) {
-	        	setStyle("-fx-background-color: green");
-			} else if(isInClosedSet){ 
-	        	setStyle("-fx-background-color: red");
 			} else {
 	        	getChildren().clear();
+	        	setStyle("-fx-background-color: pink;");
 	        }
     }
 }

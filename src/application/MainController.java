@@ -4,9 +4,11 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.ResourceBundle;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import javafx.animation.Animation;
+import javafx.animation.Animation.Status;
 import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -14,9 +16,11 @@ import javafx.event.EventHandler;
 import javafx.event.EventTarget;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.geometry.Insets;
 import javafx.scene.Node;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -25,11 +29,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.BackgroundFill;
-import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.GridPane;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
@@ -67,8 +67,8 @@ public class MainController implements Initializable
 	
 	private Cell goalCell;
 	
-	private static final int ROWS = 40;
-    private static final int COLS = 60;
+	private static final int ROWS = 41;
+    private static final int COLS = 61;
 	
 	private Cell[][] cells;
 	
@@ -83,15 +83,27 @@ public class MainController implements Initializable
 
 	private ArrayList<Cell> closedSet = new ArrayList<Cell>();
 	//closedSet stores all the nodes that finished being evaluated.
-	private Timeline timeline = new Timeline();
+	
+	private ArrayList<Cell> path = new ArrayList<Cell>();
+	
+	private Timeline evaluationTimeline = new Timeline();
+	
+	private Timeline pathTimeline = new Timeline();
 
+	private double animationSpeed = 5.0;
+		
 	private int pointTimeline = 0;
+	
+	private boolean goalAchieved = false;
+	
+	
 	@Override
 	public void initialize(URL arg0, ResourceBundle arg1)
 	{
 		grid.addEventHandler(MouseEvent.MOUSE_CLICKED, hnd);		
 		grid.addEventHandler(MouseEvent.MOUSE_DRAGGED, hndDrag);
 		grid.setGridLinesVisible(bShowGridLines);
+
 		
 		tilePickerComboBox.getItems().add("Wall");
 		tilePickerComboBox.getItems().add("Source node");
@@ -105,9 +117,11 @@ public class MainController implements Initializable
 			@Override
 			public void changed(
 				ObservableValue<? extends Number> obsValue, Number oldValue, Number newValue) {
-				//System.out.println(obsValue);			
 				sliderValueLabel.textProperty().setValue(String.valueOf(newValue.intValue() + "%"));				
 				tt.setText(newValue.intValue() + "%");
+
+				animationSpeed = mapValue(newValue.doubleValue(), 1, 100, 5, 130);
+				//animationSpeed = newValue.intValue();
 			}
 					
 		});		
@@ -116,7 +130,6 @@ public class MainController implements Initializable
 		speedSlider.setTooltip(tt);
 		
 		cells = new Cell[ROWS][COLS];
-		
 
 		for(int i = 0; i < ROWS; i++)
 		{
@@ -130,59 +143,104 @@ public class MainController implements Initializable
 			}
 		}
 		
-		for(int i = 0; i < ROWS; i++)
+		for(int i = 0; i < ROWS - 1; i++)
 		{
-			for(int j = 0; j < COLS; j++)
+			for(int j = 0; j < COLS - 1; j++)
 			{	
-				if(i < ROWS - 1)
-				{
-					cells[i][j].addNeighbor(cells[i + 1][j]);
-				}
 				if(i > 0)
 				{
 					cells[i][j].addNeighbor(cells[i - 1][j]);
+				}
+				if(j > 0)
+				{
+					cells[i][j].addNeighbor(cells[i][j - 1]);
 				}
 				if(j < COLS - 1)
 				{
 					cells[i][j].addNeighbor(cells[i][j + 1]);
 				}
-				if(j > 0)
+				
+				if(i < ROWS - 1)
 				{
-					cells[i][j].addNeighbor(cells[i][j - 1]);
-				}	
+					cells[i][j].addNeighbor(cells[i + 1][j]);
+				}
+				
+				//DIAGONAL NEIGHBOR
+				if(i > 0 && j > 0)
+				{
+					cells[i][j].addNeighbor(cells[i-1][j-1]);
+				}
+				if(i > 0 && j < COLS - 1)
+				{
+					cells[i][j].addNeighbor(cells[i-1][j+1]);
+				}
+				if(i < ROWS - 1 && j > 0)
+				{
+					cells[i][j].addNeighbor(cells[i+1][j-1]);
+				}
+				if(i < ROWS - 1 && j < COLS - 1)
+				{
+					cells[i][j].addNeighbor(cells[i+1][j+1]);
+				}
 			}
 		}
 		
-		for(int i = 0; i < ROWS; i++)
-		{
-			for(int j = 0; j < COLS; j++)
-			{
-				System.out.printf("Node (%d, %d): [", i, j);
-				for(Cell c : cells[i][j].getNeighbors())
-				{
-					System.out.print(" (" + c.getI() + ", " + c.getJ() + ") ");
-				}
-				System.out.println("]");
-			}
-		}
 	}
 	
+	private double mapValue(double value, double fromMin, double fromMax, double toMin, double toMax) {
+		return toMax + ((value - fromMin) / (fromMax - fromMin)) * (toMin - toMax);
+	}
 	
-	public double calculateManhattanDistance(Cell sourceCell, Cell destCell)
+	public double heuristics(Cell sourceCell, Cell destCell)
 	{
-		return Math.abs(sourceCell.getX() - destCell.getX()) + Math.abs(sourceCell.getY() - destCell.getY()); 
+		//manhattan distance
+		return Math.abs(sourceCell.getLayoutX() - destCell.getLayoutX()) + Math.abs(sourceCell.getLayoutY() - destCell.getLayoutY());
+		//euclidian distance
+		//return (destCell.getLayoutX() - sourceCell.getLayoutX()) * 2 + (destCell.getLayoutY() - sourceCell.getLayoutY()) * 2;
 	}
 	
 	public void run()
 	{
+		//System.out.println("speed: " + animationSpeed);
+		
+		if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED)
+		{
+			for(int i = 0; i < ROWS; i++)
+			{
+				for(int j = 0; j < COLS; j++)
+				{
+					cells[i][j].isInOpenSet(false);
+					cells[i][j].isInClosedSet(false);
+					evaluationTimeline.stop();
+					evaluationTimeline.getKeyFrames().clear();
+					pathTimeline.stop();
+					pathTimeline.getKeyFrames().clear();
+					openSet.clear();
+					closedSet.clear();
+					path.clear();
+					pointTimeline = 0;
+				}
+			}
+		}
+
 		aStar();
-		timeline.play();
+		
+		evaluationTimeline.play();
+		
+		evaluationTimeline.setOnFinished(event -> {
+			//System.out.println("DONE!!! UwU");
+			System.out.println("Showing path..");
+
+				animatePath();
+		});
+		
 	}
+	
+	
 	
 	public void aStar()
 	{
 
-		//actually use background colors for the path
 		for(int i = 0; i < ROWS ; i++)
 		{
 			for(int j = 0; j < COLS ; j++)
@@ -195,27 +253,21 @@ public class MainController implements Initializable
 				{
 					goalCell = cells[i][j];
 				}
-
-				//System.out.printf("Cells(i: %d, j: %d): \n", i, j);
-				//System.out.printf("layout x: %.2f\n",cells[i][j].getLayoutX());
-				//System.out.printf("layout y: %.2f\n",cells[i][j].getLayoutY());
-					
+				
 			}
 		}
 		
 		if(startCell != null && goalCell != null)
 		{
-			//System.out.println(startCell);
-			//System.out.println(goalCell);	
 
 			openSet.add(startCell);
-			KeyFrame kf = new KeyFrame(Duration.millis(pointTimeline * 10), e -> {
-				startCell.isInOpenSet(true);
+			KeyFrame kf = new KeyFrame(Duration.millis(pointTimeline * animationSpeed), e -> {
+				startCell.setStyle("-fx-background-color: green;");
 			});
 			pointTimeline++;
 			
-			timeline.getKeyFrames().add(kf);
-			//startCell.isInOpenSet(true);
+			evaluationTimeline.getKeyFrames().add(kf);
+			startCell.isInOpenSet(true);
 			
 			while(!openSet.isEmpty())
 			{
@@ -233,37 +285,49 @@ public class MainController implements Initializable
 				
 				if(current == goalCell)
 				{
-					System.out.println("DONE! UwU");
+					path.clear();
+					Cell temp = current;
+
+					path.add(temp);
+					
+					while(temp.previous != null)
+					{
+						path.add(temp.previous);
+						temp = temp.previous;
+					}
+					
+					return;
 				}
-				
+			
 				openSet.removeIf(c -> c.equals(current));
 				
-				kf = new KeyFrame(Duration.millis(pointTimeline * 10), e -> {
-					current.isInOpenSet(false);
+				kf = new KeyFrame(Duration.millis(pointTimeline * animationSpeed), e -> {
+					current.setStyle("-fx-background-color: pink;");
 				});
 				pointTimeline++;
 				
-				timeline.getKeyFrames().add(kf);
-				//current.isInOpenSet(false);
+				evaluationTimeline.getKeyFrames().add(kf);
+				current.isInOpenSet(false);
 				
-				//check if it removes the right thing
 				closedSet.add(current);
 				
-				kf = new KeyFrame(Duration.millis(pointTimeline * 10), e -> {
-					current.isInClosedSet(true);
+				kf = new KeyFrame(Duration.millis(pointTimeline * animationSpeed), e -> {
+					current.setStyle("-fx-background-color: lightblue;");
 				});
 				pointTimeline++;
 				
-				timeline.getKeyFrames().add(kf);
-				//current.isInClosedSet(true);
+				evaluationTimeline.getKeyFrames().add(kf);
+				
+				current.isInClosedSet(true);
 				
 				ArrayList<Cell> neighbors = current.getNeighbors();
 				
 				for(int i = 0; i < neighbors.size(); i ++)
 				{
 					Cell neighbor = neighbors.get(i);
-					
-					if(!closedSet.contains(neighbor))
+					boolean newPath = false;
+
+					if(!closedSet.contains(neighbor) && !neighbor.isWall())
 					{
 						double tempG = current.gCost + 1;
 						
@@ -273,29 +337,64 @@ public class MainController implements Initializable
 							if(tempG < neighbor.gCost)
 							{
 								neighbor.gCost = tempG;
+								newPath = true;
 							}
 						}
 						else 
 						{
 							neighbor.gCost = tempG;
 							
-							kf = new KeyFrame(Duration.millis(pointTimeline * 10), e -> {
-								neighbor.isInOpenSet(true);
+							kf = new KeyFrame(Duration.millis(pointTimeline * animationSpeed), e -> {
+								neighbor.setStyle("-fx-background-color: green;");
 							});
 							pointTimeline++;
+						
+							evaluationTimeline.getKeyFrames().add(kf);
 							
-							timeline.getKeyFrames().add(kf);
-							//neighbor.isInOpenSet(true);
+							neighbor.isInOpenSet(true);
+							newPath = true;
 							openSet.add(neighbor);
 						}
+						
+
+					}
+					if(newPath)
+					{
+						neighbor.hCost = heuristics(neighbor, goalCell);
+						neighbor.fCost = neighbor.gCost + neighbor.hCost;
+						neighbor.previous = current;
+
 					}
 					
-					neighbor.hCost = calculateManhattanDistance(neighbor, goalCell);
-					neighbor.fCost = neighbor.gCost + neighbor.hCost;
 				}
-				
 			}
+			System.out.println("No solution!");
+			
+			return;
 		}
+	}
+	
+	public void animatePath()
+	{
+		System.out.println("path size: " + path.size());
+		
+		if(path.size() == 0)
+		{
+			Alert a = new Alert(AlertType.INFORMATION, "NO SOLUTION!", ButtonType.OK);
+        	a.show();
+        	return;
+		}
+		for(int i = 0; i < path.size(); i++)
+		{
+			Cell cell = path.get(i);
+			KeyFrame kf = new KeyFrame(Duration.millis(i * animationSpeed), e -> {
+				cell.setStyle("-fx-background-color: blue;");
+			});
+			
+			pathTimeline.getKeyFrames().add(kf);
+		}
+		
+		pathTimeline.play();
 	}
 	
 	public void showGridLines()
@@ -307,13 +406,13 @@ public class MainController implements Initializable
 	public void generateRandomWalls()
 	{
 		//TODO: animate this bullshit
-		for(int i = 0; i < ROWS; i++)
+		for(int i = 0; i < ROWS - 1; i++)
 		{
 			for(int j = 0; j < COLS; j++)
 			{ 
 				if(!cells[i][j].isStartCell() && !cells[i][j].isGoalCell())
 				{
-					if(r.nextFloat(1) < 0.3)
+					if(r.nextFloat(1) < 0.4)
 					{
 						cells[i][j].isWall(true);
 					}
@@ -334,7 +433,7 @@ public class MainController implements Initializable
 	
 	public void generateMaze()
 	{
-		for(int i = 0; i < ROWS; i++)
+		for(int i = 0; i < ROWS - 1; i++)
 		{
 			for(int j = 0; j < COLS; j++)
 			{ 
@@ -346,30 +445,22 @@ public class MainController implements Initializable
 			}
 		}
 		
-		for(int i = 0; i < ROWS; i++)
+		for(int i = 0; i < ROWS - 1; i++)
 		{
-			int n = r.nextInt(4);
+			cells[i][0].isWall(true);
+			cells[i][COLS - 2].isWall(true);
 			
-			if(n < 2)
-			{	
-				if(!cells[i][0].isStartCell() && !cells[i][0].isGoalCell())
-				cells[i][0].isWall(true);
-
-			}
-			
-			n = r.nextInt(4);
-			if(n < 2)
-			{
-				if(!cells[i][COLS - 1].isStartCell() && !cells[i][COLS - 1].isGoalCell())
-				{
-					cells[i][COLS - 1].isWall(true);
-				}
-			}
 		}
 		
-		for(int i = 0; i < ROWS; i++)
+		for(int j = 0; j < COLS - 1; j++)
 		{
-			for(int j = 0; j < COLS; j = j + 2)
+			cells[ROWS - 2][j].isWall(true);
+			cells[0][j].isWall(true);
+		}
+		
+		for(int i = 0; i < ROWS - 3; i++)
+		{
+			for(int j = 0; j < COLS - 2; j = j + 2)
 			{ 
 				if(j > 0 && i < ROWS - 1)
 				{
@@ -390,6 +481,14 @@ public class MainController implements Initializable
 				}
 			}
 		}
+		
+		for(int i = 0; i < ROWS - 3; i++)
+		{
+			for(int j = 0; j < COLS - 2; j = j + 2)
+			{
+				
+			}	
+		}
 	}
 	
 	public void clearGrid()
@@ -401,6 +500,17 @@ public class MainController implements Initializable
 				cells[i][j].isWall(false);
 				cells[i][j].setStartCell(false);
 				cells[i][j].setGoalCell(false);
+				cells[i][j].isInOpenSet(false);
+				cells[i][j].isInClosedSet(false);
+				startCell = null;
+				goalCell = null;
+				evaluationTimeline.stop();
+				evaluationTimeline.getKeyFrames().clear();
+				pathTimeline.stop();
+				pathTimeline.getKeyFrames().clear();
+				openSet.clear();
+				closedSet.clear();
+				pointTimeline = 0;
 			}
 		} 
 	}
@@ -423,6 +533,26 @@ public class MainController implements Initializable
 								}
 								else
 								{
+									if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED)
+									{
+										for(int i = 0; i < ROWS; i++)
+										{
+											for(int j = 0; j < COLS; j++)
+											{
+												cells[i][j].isInOpenSet(false);
+												cells[i][j].isInClosedSet(false);
+												evaluationTimeline.stop();
+												evaluationTimeline.getKeyFrames().clear();
+												pathTimeline.stop();
+												pathTimeline.getKeyFrames().clear();
+												openSet.clear();
+												closedSet.clear();
+												pointTimeline = 0;
+											}
+										}
+										//clearGrid();
+									}
+									
 									Cell cell = (Cell)intNode;
 									
 									if(!cell.isWall())
@@ -443,6 +573,26 @@ public class MainController implements Initializable
 						try {
 							if(ev.getPickResult().getIntersectedNode().toString().contains("Circle"))
 							{
+								if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED)
+								{
+									for(int i = 0; i < ROWS; i++)
+									{
+										for(int j = 0; j < COLS; j++)
+										{
+											cells[i][j].isInOpenSet(false);
+											cells[i][j].isInClosedSet(false);
+											evaluationTimeline.stop();
+											evaluationTimeline.getKeyFrames().clear();
+											pathTimeline.stop();
+											pathTimeline.getKeyFrames().clear();
+											openSet.clear();
+											closedSet.clear();
+											pointTimeline = 0;
+										}
+									}
+									//clearGrid();
+								}
+								
 								Circle c = (Circle)ev.getPickResult().getIntersectedNode();
 								Cell parentCell = (Cell)c.getParent();
 								parentCell.isWall(false);
@@ -451,7 +601,32 @@ public class MainController implements Initializable
 							}
 							if(ev.getPickResult().getIntersectedNode().toString().contains("Cell"))
 							{
+								
 								Cell cell = (Cell)ev.getPickResult().getIntersectedNode();
+								
+								if(cell.isWall())
+								{
+									if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED)
+									{
+										for(int i = 0; i < ROWS; i++)
+										{
+											for(int j = 0; j < COLS; j++)
+											{
+												cells[i][j].isInOpenSet(false);
+												cells[i][j].isInClosedSet(false);
+												evaluationTimeline.stop();
+												evaluationTimeline.getKeyFrames().clear();
+												pathTimeline.stop();
+												pathTimeline.getKeyFrames().clear();
+												openSet.clear();
+												closedSet.clear();
+												pointTimeline = 0;
+											}
+										}
+										//clearGrid();
+									}
+								}
+								
 								cell.isWall(false);
 								cell.setStartCell(false);
 								cell.setGoalCell(false);
@@ -464,16 +639,17 @@ public class MainController implements Initializable
 						
 					}
 				}
-		
+
 			};
 
+	
 	EventHandler<MouseEvent> hnd = new EventHandler<MouseEvent>()
 	{
 		@Override
 		public void handle(MouseEvent ev) {
 			EventTarget et = ev.getTarget();
 
-			if(et.toString().contains("Grid"))
+			if(et.toString().contains("Grid") || et.toString().contains("Line"))
 			{
 				return;
 			}
@@ -487,14 +663,64 @@ public class MainController implements Initializable
 			
 			if(ev.getButton() == MouseButton.PRIMARY)
 			{
+				
+				if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED)
+				{
+					for(int i = 0; i < ROWS; i++)
+					{
+						for(int j = 0; j < COLS; j++)
+						{
+							cells[i][j].isInOpenSet(false);
+							cells[i][j].isInClosedSet(false);
+							evaluationTimeline.stop();
+							evaluationTimeline.getKeyFrames().clear();
+							pathTimeline.stop();
+							pathTimeline.getKeyFrames().clear();
+							openSet.clear();
+							closedSet.clear();
+							pointTimeline = 0;
+						}
+					}
+					//clearGrid();
+				}
+				
 				if(tilePickerComboBox.getValue() == null || tilePickerComboBox.getValue() == "Wall")
 				{	
+					if(cell == null)
+					{
+						return; 
+					}
+					
 					if(!cell.isWall())
 					{
 						cell.isWall(true);
 					}
 				}
 				else if(tilePickerComboBox.getValue() == "Source node") {
+					System.out.println();
+					if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED || evaluationTimeline.getStatus() == Status.STOPPED)
+					{
+						for(int i = 0; i < ROWS; i++)
+						{
+							for(int j = 0; j < COLS; j++)
+							{
+								cells[i][j].isInOpenSet(false);
+								cells[i][j].isInClosedSet(false);
+								evaluationTimeline.stop();
+								evaluationTimeline.getKeyFrames().clear();
+								pathTimeline.stop();
+								pathTimeline.getKeyFrames().clear();
+								openSet.clear();
+								closedSet.clear();
+								pointTimeline = 0;
+							}
+						}
+						//clearGrid();
+					}
+					if(cell == null)
+					{
+						return;
+					}
 					
 					for(int i = 0; i < ROWS; i ++)
 					{
@@ -507,10 +733,33 @@ public class MainController implements Initializable
 						}
 					}
 					
-					Cell c = (Cell)et;
-					c.setStartCell(true);
+					
+					cell.setStartCell(true);
 					
 				} else {
+					if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED)
+					{
+						for(int i = 0; i < ROWS; i++)
+						{
+							for(int j = 0; j < COLS; j++)
+							{
+								cells[i][j].isInOpenSet(false);
+								cells[i][j].isInClosedSet(false);
+								evaluationTimeline.stop();
+								evaluationTimeline.getKeyFrames().clear();
+								pathTimeline.stop();
+								pathTimeline.getKeyFrames().clear();
+								openSet.clear();
+								closedSet.clear();
+								pointTimeline = 0;
+							}
+						}
+						//clearGrid();
+					}
+					if(cell == null)
+					{
+						return;
+					}
 					for(int i = 0; i < ROWS; i ++)
 					{
 						for(int j = 0; j < COLS; j++)
@@ -522,14 +771,36 @@ public class MainController implements Initializable
 						}
 					}
 					
-					Cell c = (Cell)et;
-					c.setGoalCell(true);
+					
+					
+					cell.setGoalCell(true);
 				}
 			}
 			if(ev.getButton() == MouseButton.SECONDARY) //DELETUS TYPE OF NODUS
 			{
+				
 				if(et.toString().contains("Circle"))
 				{
+					if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED)
+					{
+						for(int i = 0; i < ROWS; i++)
+						{
+							for(int j = 0; j < COLS; j++)
+							{
+								cells[i][j].isInOpenSet(false);
+								cells[i][j].isInClosedSet(false);
+								evaluationTimeline.stop();
+								evaluationTimeline.getKeyFrames().clear();
+								pathTimeline.stop();
+								pathTimeline.getKeyFrames().clear();
+								openSet.clear();
+								closedSet.clear();
+								pointTimeline = 0;
+							}
+						}
+						//clearGrid();
+					}
+					
 					Circle c = (Circle)et;
 					Cell parentCell = (Cell)c.getParent();
 					parentCell.isWall(false);
@@ -538,6 +809,26 @@ public class MainController implements Initializable
 				}
 				if(et.toString().contains("Cell"))
 				{
+					if(evaluationTimeline.getStatus() == Status.RUNNING || evaluationTimeline.getStatus() == Status.STOPPED)
+					{
+						for(int i = 0; i < ROWS; i++)
+						{
+							for(int j = 0; j < COLS; j++)
+							{
+								cells[i][j].isInOpenSet(false);
+								cells[i][j].isInClosedSet(false);
+								evaluationTimeline.stop();
+								evaluationTimeline.getKeyFrames().clear();
+								pathTimeline.stop();
+								pathTimeline.getKeyFrames().clear();
+								openSet.clear();
+								closedSet.clear();
+								pointTimeline = 0;
+							}
+						}
+						//clearGrid();
+					}
+					
 					cell.isWall(false);
 					cell.setStartCell(false);
 					cell.setGoalCell(false);

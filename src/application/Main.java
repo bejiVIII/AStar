@@ -17,8 +17,8 @@ public class Main extends Application {
 			scene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
 			
 			stage.setWidth(1580);
-			stage.setHeight(800);
-			stage.setResizable(false);
+			stage.setHeight(839);
+			stage.setResizable(true);
 			stage.setTitle("A*");
 			stage.setScene(scene);
 			stage.show();
